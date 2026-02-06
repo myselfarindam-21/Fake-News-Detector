@@ -9,7 +9,7 @@ import google.generativeai as genai
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-# LOAD ENVIRONMENT VARIABLES
+
 load_dotenv()
 
 NEWS_API_KEY = os.getenv("NEWS_API_KEY")
@@ -18,23 +18,23 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 FLASK_SECRET = os.getenv("FLASK_SECRET")
 GEMINI_TIMEOUT = int(os.getenv("GEMINI_TIMEOUT", 8))
 
-# CONSTANTS
+
 WIKI_SEARCH_URL = "https://en.wikipedia.org/w/api.php"
 WIKI_SUMMARY_URL = "https://en.wikipedia.org/api/rest_v1/page/summary/{}"
 FACTCHECK_URL = "https://factchecktools.googleapis.com/v1alpha1/claims:search"
 NEWS_API_URL = "https://newsapi.org/v2/everything"
 nlp = spacy.load("en_core_web_sm")
 
-# THRESHOLDS
+
 WIKI_SIM_THRESHOLD = 0.25
 NEWS_SIM_THRESHOLD = 0.15
 
-# INITIALIZATION
+
 app = Flask(__name__)
 app.secret_key = FLASK_SECRET
 genai.configure(api_key=GEMINI_API_KEY)
 
-# CLEAN TEXT
+
 def clean_text(text):
     text = str(text).strip()
     text = re.sub(r"http\S+|www\S+", "", text)
@@ -56,7 +56,7 @@ def contains_emoji(text):
     return bool(EMOJI_PATTERN.search(text))
 
 
-# NEWS VALIDATION
+
 def is_valid_news(text):
     text = text.strip()
 
@@ -65,29 +65,29 @@ def is_valid_news(text):
 
     doc = nlp(text)
 
-    # Reject emojis
+    
     if contains_emoji(text):
         return False, "Contains emojis."
 
-    # Must contain at least one verb
+    
     if not any(tok.pos_ == "VERB" for tok in doc):
         return False, "No action detected (missing verb)."
 
-    # Must mention at least one noun
+    
     if not any(tok.pos_ in ["NOUN", "PROPN"] for tok in doc):
         return False, "Missing a subject or object."
 
     return True, "Valid news input."
 
     
-# TF-IDF similarity check
+
 def similarity(a, b):
     vectorizer = TfidfVectorizer()
     tfidf = vectorizer.fit_transform([a, b])
     sim = cosine_similarity(tfidf[0:1], tfidf[1:2])[0][0]
     return float(sim)
 
-# WIKIPEDIA
+
 def wiki_verify(query):
     try:
         r = requests.get(WIKI_SEARCH_URL, params={
@@ -128,7 +128,7 @@ def wiki_verify(query):
 
     except Exception:
         return False, None, 0.0
-# NEWS API
+
 def news_verify(text):
     try:
         r = requests.get(NEWS_API_URL, params={
@@ -159,7 +159,7 @@ def news_verify(text):
     except Exception:
         return False, None, 0.0
 
-# GEMINI CONTEXTUAL REASONING
+
 def gemini_context_analysis(text):
     try:
         model = genai.GenerativeModel("models/gemini-2.5-flash")
@@ -184,7 +184,7 @@ UNCERTAIN - <short reason>
         print("Gemini API error:", e)
         return "UNCERTAIN - Gemini reasoning failed"
 
-# GOOGLE FACT CHECK
+
 def factcheck_verify(text):
     try:
         params = {"query": text, "key": GOOGLE_FACTCHECK_API_KEY}
@@ -204,7 +204,7 @@ def factcheck_verify(text):
     except Exception:
         return False, None, None
 
-# ROUTES
+
 @app.route("/")
 def home():
     return render_template("index.html")
@@ -214,7 +214,7 @@ def predict():
     data = request.get_json()
     user_text = clean_text(data.get("text", "").strip())
 
-    # Validation
+    
     ok, reason = is_valid_news(user_text)
     if not ok:
         return jsonify({
@@ -225,17 +225,17 @@ def predict():
 
     print(f"\n🧠 Analyzing: {user_text}\n{'-'*60}")
 
-    # Initial Defaults
+    
     prediction, confidence, api_match = "Uncertain", 60.0, "No strong match found"
 
-    # 1. Wikipedia Verification
+    
     w_ok, w_title, w_sim = wiki_verify(user_text)
     if w_ok:
         prediction = "Real"
         confidence = w_sim * 100
         api_match = f"Wikipedia: {w_title}"
 
-    # 2. NewsAPI Verification
+    
     elif True:
         n_ok, article, n_sim = news_verify(user_text)
         if n_ok:
@@ -243,7 +243,7 @@ def predict():
             confidence = n_sim * 100
             api_match = f"{article['source']['name']} - {article['title']}"
 
-        # 3. Gemini Context Analysis
+        
         else:
             gem = gemini_context_analysis(user_text)
             api_match = gem
@@ -258,7 +258,7 @@ def predict():
                 prediction = "Uncertain"
                 confidence = 60
 
-      # 4. Google Fact Check
+      
     fc_ok, rating, publisher = factcheck_verify(user_text)
     if fc_ok and rating:  # Only override if rating exists
         if "true" in rating.lower():
@@ -276,7 +276,7 @@ def predict():
             confidence = 70.0
             api_match = f"Google Fact Check ({publisher}: {rating})"
 
-    # Save to History
+    
     history = session.get("history", [])
     history.insert(0, {
         "timestamp": datetime.now().strftime("%H:%M:%S"),
