@@ -260,7 +260,7 @@ def predict():
 
       
     fc_ok, rating, publisher = factcheck_verify(user_text)
-    if fc_ok and rating:  # Only override if rating exists
+    if fc_ok and rating:
         if "true" in rating.lower():
             prediction = "Real"
             confidence = 95.0
